@@ -1,11 +1,16 @@
-import type { ManagedMetadataLayout } from "./ManagedMetadataLayout.js";
-import { metadataRowCursor, metadataToken } from "./ManagedMetadataHeaps.js";
+import type { ManagedMetadataLayout } from "../domain/managed/managedMetadataLayout.js";
+import {
+  metadataRowCursor,
+  metadataToken,
+} from "../domain/managed/managedMetadataHeaps.js";
 
 /** Meaning of the MethodDef implementation bits, independent of RVA or ImplMap evidence. */
 export interface ManagedMethodImplementationFlags {
   readonly codeType: "il" | "native" | "optil" | "runtime";
   readonly managedKind: "managed" | "unmanaged";
   readonly pinvokeFlag: boolean;
+  /** MethodImplOptions.InternalCall (0x1000): the runtime implements the body. */
+  readonly internalCall: boolean;
 }
 
 const METHOD_CODE_TYPES = ["il", "native", "optil", "runtime"] as const;
@@ -27,9 +32,9 @@ export const readMethodDefinitionRow = (
 } => {
   // Layout admission bounds the whole fixed-width row before a cursor is created.
   const cursor = metadataRowCursor(bytes, layout, 6, row);
-  const rva = cursor.readUInt32();
-  const implFlags = cursor.readUInt16();
-  const flags = cursor.readUInt16();
+  const rva = cursor.u32();
+  const implFlags = cursor.u16();
+  const flags = cursor.u16();
   return {
     token: metadataToken(6, row),
     rowOffset: cursor.start,
@@ -42,6 +47,7 @@ export const readMethodDefinitionRow = (
       codeType: METHOD_CODE_TYPES[(implFlags & 0x0003) as 0 | 1 | 2 | 3],
       managedKind: (implFlags & 0x0004) === 0 ? "managed" : "unmanaged",
       pinvokeFlag: (flags & 0x2000) !== 0,
+      internalCall: (implFlags & 0x1000) !== 0,
     },
   };
 };
